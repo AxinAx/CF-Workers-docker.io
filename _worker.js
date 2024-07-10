@@ -144,36 +144,38 @@ export default {
 			pathname === '/auth/profile',
 		];
 
-		if (conditions.some(condition => condition) && (fakePage === true || hostTop == 'docker')) {
-			if (env.URL302){
-				return Response.redirect(env.URL302, 302);
-			} else if (env.URL){
-				if (env.URL.toLowerCase() == 'nginx'){
-					//首页改成一个nginx伪装页
-					return new Response(await nginx(), {
-						headers: {
-							'Content-Type': 'text/html; charset=UTF-8',
-						},
-					});
-				} else return fetch(new Request(env.URL, request));
+		if (pathname === '/' || getReqHeader('Origin') || getReqHeader('Referer')) {
+			if (conditions.some(condition => condition) && (fakePage === true || hostTop == 'docker')) {
+				if (env.URL302){
+					return Response.redirect(env.URL302, 302);
+				} else if (env.URL){
+					if (env.URL.toLowerCase() == 'nginx'){
+						//首页改成一个nginx伪装页
+						return new Response(await nginx(), {
+							headers: {
+								'Content-Type': 'text/html; charset=UTF-8',
+							},
+						});
+					} else return fetch(new Request(env.URL, request));
+				}
+				
+				const newUrl = new URL("https://registry.hub.docker.com" + pathname + url.search);
+	
+				// 复制原始请求的标头
+				const headers = new Headers(request.headers);
+	
+				// 确保 Host 头部被替换为 hub.docker.com
+				headers.set('Host', 'registry.hub.docker.com');
+	
+				const newRequest = new Request(newUrl, {
+						method: request.method,
+						headers: headers,
+						body: request.method !== 'GET' && request.method !== 'HEAD' ? await request.blob() : null,
+						redirect: 'follow'
+				});
+	
+				return fetch(newRequest);
 			}
-			
-			const newUrl = new URL("https://registry.hub.docker.com" + pathname + url.search);
-
-			// 复制原始请求的标头
-			const headers = new Headers(request.headers);
-
-			// 确保 Host 头部被替换为 hub.docker.com
-			headers.set('Host', 'registry.hub.docker.com');
-
-			const newRequest = new Request(newUrl, {
-					method: request.method,
-					headers: headers,
-					body: request.method !== 'GET' && request.method !== 'HEAD' ? await request.blob() : null,
-					redirect: 'follow'
-			});
-
-			return fetch(newRequest);
 		}
 
 		// 修改包含 %2F 和 %3A 的请求
